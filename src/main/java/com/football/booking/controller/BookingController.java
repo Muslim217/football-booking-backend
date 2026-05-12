@@ -72,6 +72,17 @@ public class BookingController {
         return ResponseEntity.ok(bookingService.cancelBooking(id, authentication));
     }
 
+    @GetMapping("/owner")
+    @SecurityRequirement(name = "bearerAuth")
+    @Operation(summary = "Все брони по полям владельца (OWNER/ADMIN)")
+    public ResponseEntity<Page<BookingResponse>> getOwnerBookings(
+            Authentication authentication,
+            @RequestParam(defaultValue = "0")  int page,
+            @RequestParam(defaultValue = "50") int size) {
+        Pageable pageable = PageRequest.of(page, size, Sort.by("startTime").descending());
+        return ResponseEntity.ok(bookingService.getOwnerBookings(authentication, pageable));
+    }
+
     @GetMapping("/field/{fieldId}")
     @Operation(summary = "Бронирования по площадке (с пагинацией)")
     public ResponseEntity<Page<BookingResponse>> getBookingsByField(

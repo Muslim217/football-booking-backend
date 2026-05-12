@@ -4,7 +4,7 @@ import com.football.booking.dto.request.LoginRequest;
 import com.football.booking.dto.request.RefreshTokenRequest;
 import com.football.booking.dto.request.RegisterRequest;
 import com.football.booking.dto.response.AuthResponse;
-import com.football.booking.dto.response.MessageResponse;
+import com.football.booking.dto.response.MessageResponse; // used by logout
 import com.football.booking.service.AuthService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -22,8 +22,8 @@ public class AuthController {
     private final AuthService authService;
 
     @PostMapping("/register")
-    @Operation(summary = "Регистрация нового пользователя")
-    public ResponseEntity<MessageResponse> register(@Valid @RequestBody RegisterRequest request) {
+    @Operation(summary = "Регистрация нового пользователя (автоматически выдаёт токены)")
+    public ResponseEntity<AuthResponse> register(@Valid @RequestBody RegisterRequest request) {
         return ResponseEntity.ok(authService.register(request));
     }
 

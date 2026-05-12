@@ -4,7 +4,7 @@ import com.football.booking.dto.request.LoginRequest;
 import com.football.booking.dto.request.RefreshTokenRequest;
 import com.football.booking.dto.request.RegisterRequest;
 import com.football.booking.dto.response.AuthResponse;
-import com.football.booking.dto.response.MessageResponse;
+import com.football.booking.dto.response.MessageResponse; // used by login/logout
 import com.football.booking.entity.RefreshToken;
 import com.football.booking.entity.User;
 import com.football.booking.enums.Role;
@@ -41,7 +41,7 @@ public class AuthService {
     private long refreshExpirationMs;
 
     @Transactional
-    public MessageResponse register(RegisterRequest request) {
+    public AuthResponse register(RegisterRequest request) {
         if (userRepository.existsByUsername(request.getUsername())) {
             throw new IllegalArgumentException("Пользователь с таким именем уже существует");
         }
@@ -49,15 +49,39 @@ public class AuthService {
             throw new IllegalArgumentException("Email уже используется");
         }
 
+        Role role = Role.USER;
+        if (request.getRole() != null && !request.getRole().isBlank()) {
+            String roleUpper = request.getRole().toUpperCase();
+            if ("ADMIN".equals(roleUpper)) {
+                throw new IllegalArgumentException("Недопустимая роль: ADMIN");
+            }
+            try {
+                role = Role.valueOf(roleUpper);
+            } catch (IllegalArgumentException e) {
+                throw new IllegalArgumentException("Неизвестная роль: " + request.getRole() + ". Допустимые значения: USER, OWNER");
+            }
+        }
+
         User user = User.builder()
                 .username(request.getUsername())
                 .email(request.getEmail())
                 .password(passwordEncoder.encode(request.getPassword()))
-                .role(Role.USER)
+                .role(role)
                 .build();
 
-        userRepository.save(user);
-        return new MessageResponse("Пользователь успешно зарегистрирован");
+        user = userRepository.save(user);
+
+        String accessToken  = jwtTokenProvider.generateAccessToken(user.getUsername());
+        String refreshToken = createRefreshToken(user);
+
+        return AuthResponse.builder()
+                .accessToken(accessToken)
+                .refreshToken(refreshToken)
+                .tokenType("Bearer")
+                .expiresIn(jwtExpirationMs / 1000)
+                .username(user.getUsername())
+                .role(user.getRole().name())
+                .build();
     }
 
     @Transactional

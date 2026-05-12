@@ -21,6 +21,7 @@ public interface BookingRepository extends JpaRepository<Booking, Long> {
     // С пагинацией (для API)
     Page<Booking> findByUserId(Long userId, Pageable pageable);
     Page<Booking> findByFieldId(Long fieldId, Pageable pageable);
+    Page<Booking> findByFieldIdIn(List<Long> fieldIds, Pageable pageable);
 
     @Query("SELECT b FROM Booking b WHERE b.field.id = :fieldId " +
            "AND b.status <> 'CANCELLED' " +

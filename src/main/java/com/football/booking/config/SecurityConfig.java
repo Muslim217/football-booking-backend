@@ -40,6 +40,7 @@ public class SecurityConfig {
                 // Публичные эндпоинты
                 .requestMatchers("/api/auth/**").permitAll()
                 .requestMatchers(HttpMethod.GET, "/api/fields", "/api/fields/{id}", "/api/fields/{id}/schedule").permitAll()
+                .requestMatchers(HttpMethod.GET, "/api/bookings/field/**").permitAll()
                 // Swagger / H2
                 .requestMatchers("/swagger-ui/**", "/v3/api-docs/**", "/swagger-ui.html").permitAll()
                 .requestMatchers("/h2-console/**").permitAll()

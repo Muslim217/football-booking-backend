@@ -6,6 +6,7 @@ import com.football.booking.dto.response.TimeSlotResponse;
 import com.football.booking.entity.Booking;
 import com.football.booking.entity.Field;
 import com.football.booking.entity.User;
+import com.football.booking.enums.FieldType;
 import com.football.booking.enums.Role;
 import com.football.booking.exception.AccessDeniedException;
 import com.football.booking.exception.ResourceNotFoundException;
@@ -14,6 +15,7 @@ import com.football.booking.repository.FieldRepository;
 import com.football.booking.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
 import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Service;
@@ -26,6 +28,7 @@ import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -41,9 +44,40 @@ public class FieldService {
 
     // === Публичные методы ===
 
-    public Page<FieldResponse> getAllActiveFields(Pageable pageable) {
-        return fieldRepository.findByIsActiveTrue(pageable)
-                .map(this::mapToResponse);
+    public Page<FieldResponse> getAllActiveFields(Pageable pageable, String type, String search) {
+        // Если фильтры не заданы — стандартный запрос с пагинацией на уровне БД
+        if ((type == null || type.isBlank()) && (search == null || search.isBlank())) {
+            return fieldRepository.findByIsActiveTrue(pageable)
+                    .map(this::mapToResponse);
+        }
+
+        // Если фильтры заданы — загружаем все активные и фильтруем в памяти
+        FieldType fieldTypeFilter = null;
+        if (type != null && !type.isBlank()) {
+            try {
+                fieldTypeFilter = FieldType.valueOf(type.toUpperCase());
+            } catch (IllegalArgumentException ignored) {
+                // Неизвестный тип — вернём пустую страницу
+                return Page.empty(pageable);
+            }
+        }
+
+        final FieldType finalFieldTypeFilter = fieldTypeFilter;
+        final String lowerSearch = (search != null && !search.isBlank()) ? search.toLowerCase() : null;
+
+        List<Field> all = fieldRepository.findByIsActiveTrue();
+        List<FieldResponse> filtered = all.stream()
+                .filter(f -> finalFieldTypeFilter == null || f.getFieldType() == finalFieldTypeFilter)
+                .filter(f -> lowerSearch == null
+                        || (f.getName() != null && f.getName().toLowerCase().contains(lowerSearch))
+                        || (f.getAddress() != null && f.getAddress().toLowerCase().contains(lowerSearch)))
+                .map(this::mapToResponse)
+                .collect(Collectors.toList());
+
+        int start = (int) pageable.getOffset();
+        int end = Math.min(start + pageable.getPageSize(), filtered.size());
+        List<FieldResponse> pageContent = start >= filtered.size() ? List.of() : filtered.subList(start, end);
+        return new PageImpl<>(pageContent, pageable, filtered.size());
     }
 
     public FieldResponse getFieldById(Long id) {
@@ -68,6 +102,7 @@ public class FieldService {
 
         List<TimeSlotResponse> slots = new ArrayList<>();
         LocalTime cursor = OPEN_TIME;
+        LocalDateTime now = LocalDateTime.now();
 
         while (cursor.isBefore(CLOSE_TIME)) {
             LocalTime slotEnd = cursor.plusHours(1);
@@ -79,7 +114,7 @@ public class FieldService {
                     b.getEndTime().isAfter(slotStart_dt));
 
             // Прошедшие слоты тоже недоступны
-            boolean isPast = slotStart_dt.isBefore(LocalDateTime.now());
+            boolean isPast = slotStart_dt.isBefore(now);
 
             BigDecimal slotPrice = field.getPricePerHour()
                     .setScale(2, RoundingMode.HALF_UP);

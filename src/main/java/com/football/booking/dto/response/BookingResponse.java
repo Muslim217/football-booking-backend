@@ -19,6 +19,7 @@ public class BookingResponse {
     private String username;
     private Long fieldId;
     private String fieldName;
+    private String fieldAddress;
     private LocalDateTime startTime;
     private LocalDateTime endTime;
     private BigDecimal totalPrice;

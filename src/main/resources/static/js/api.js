@@ -92,6 +92,15 @@ async function apiDelete(path) {
   return true;
 }
 
+// ===== api object (shorthand for HTML pages) =====
+const api = {
+  get:    (path)        => apiGet(path),
+  post:   (path, body)  => apiPost(path, body),
+  put:    (path, body)  => apiPut(path, body),
+  patch:  (path, body)  => apiPatch(path, body),
+  delete: (path)        => apiDelete(path),
+};
+
 // ===== Formatting =====
 function formatPrice(price) {
   return Number(price).toLocaleString('ru-RU') + '\u00a0₽';

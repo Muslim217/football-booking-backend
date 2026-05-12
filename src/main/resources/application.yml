@@ -11,7 +11,7 @@ spring:
 jwt:
   # Dev: захардкоженный секрет (только для разработки!)
   # Prod: передавай через переменную окружения -DJWT_SECRET=... или export JWT_SECRET=...
-  secret: ${JWT_SECRET:ZmQ0ZDExNjIzMDUyMGRmOTBhZjQ1MmQ1MmQ3ZWYwOGIyMWYyNjNiZDQ0NWJiZTRkMzY0YzQxN2E4MzUzYmYwMQ==}
+  secret: ${JWT_SECRET:dev-secret-key-change-in-production-minimum-32-chars}
   expiration: 3600000           # 1 час (access token)
   refresh-expiration: 2592000000 # 30 дней (refresh token)
 
@@ -22,7 +22,7 @@ spring:
     activate:
       on-profile: dev
   datasource:
-    url: jdbc:h2:mem:footballdb;DB_CLOSE_DELAY=-1;MODE=PostgreSQL;DEFAULT_NULL_ORDERING=HIGH
+    url: jdbc:h2:file:./data/footballdb;DB_CLOSE_DELAY=-1;MODE=PostgreSQL;DEFAULT_NULL_ORDERING=HIGH
     driver-class-name: org.h2.Driver
     username: sa
     password:

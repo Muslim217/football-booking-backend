@@ -31,12 +31,14 @@ public class FieldController {
     private final FieldService fieldService;
 
     @GetMapping
-    @Operation(summary = "Все активные площадки (с пагинацией)")
+    @Operation(summary = "Все активные площадки (с пагинацией и фильтрацией)")
     public ResponseEntity<Page<FieldResponse>> getAllActiveFields(
             @RequestParam(defaultValue = "0")  int page,
-            @RequestParam(defaultValue = "10") int size) {
+            @RequestParam(defaultValue = "10") int size,
+            @RequestParam(required = false) String type,
+            @RequestParam(required = false) String search) {
         Pageable pageable = PageRequest.of(page, size, Sort.by("createdAt").descending());
-        return ResponseEntity.ok(fieldService.getAllActiveFields(pageable));
+        return ResponseEntity.ok(fieldService.getAllActiveFields(pageable, type, search));
     }
 
     @GetMapping("/{id}")

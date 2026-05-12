@@ -46,6 +46,7 @@ public class FieldService {
 
     // === Публичные методы ===
 
+    @Transactional(readOnly = true)
     public Page<FieldResponse> getAllActiveFields(Pageable pageable, String type, String search,
                                                   Authentication authentication) {
         FieldType fieldTypeFilter = null;
@@ -114,6 +115,7 @@ public class FieldService {
 
     // === Методы владельца (OWNER) ===
 
+    @Transactional(readOnly = true)
     public Page<FieldResponse> getMyFields(Authentication authentication, Pageable pageable) {
         User owner = getAuthenticatedUser(authentication);
         return fieldRepository.findByOwnerId(owner.getId(), pageable)
@@ -230,7 +232,8 @@ public class FieldService {
                 .reviewCount(field.getReviewCount())
                 .favoriteCount(field.getFavoriteCount())
                 .isFavorite(isFavorite)
-                .ownerVerificationStatus(field.getOwner().getVerificationStatus())
+                .ownerVerificationStatus(
+                        field.getOwner() != null ? field.getOwner().getVerificationStatus() : null)
                 .build();
     }
 

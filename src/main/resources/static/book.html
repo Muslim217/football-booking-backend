@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Бронирование — Площадка</title>
+  <link rel="stylesheet" href="/css/style.css">
+  <style>
+    .book-layout{display:grid;grid-template-columns:1fr 360px;gap:28px;align-items:start}
+    @media(max-width:900px){.book-layout{grid-template-columns:1fr}}
+    .field-hero{
+      background:var(--fb-primary-deep);border-radius:var(--r-lg);
+      height:200px;position:relative;overflow:hidden;margin-bottom:24px
+    }
+    .field-hero::before{content:"";position:absolute;inset:16px;
+      border:2px solid rgba(255,255,255,.3);border-radius:4px}
+    .field-hero::after{content:"";position:absolute;left:50%;top:50%;
+      transform:translate(-50%,-50%);width:70px;height:70px;border-radius:50%;
+      border:2px solid rgba(255,255,255,.3)}
+    .field-hero .center-line{position:absolute;left:50%;top:0;bottom:0;
+      width:2px;background:rgba(255,255,255,.2);transform:translateX(-50%)}
+    .field-hero .field-info{
+      position:absolute;bottom:16px;left:16px;right:16px;
+      background:rgba(14,63,27,.85);backdrop-filter:blur(8px);
+      border-radius:var(--r-sm);padding:12px 16px;
+      display:flex;justify-content:space-between;align-items:center
+    }
+    .field-info h2{color:#fff;font-size:17px;font-weight:700;margin:0}
+    .field-info .price{color:var(--fb-accent);font-family:var(--mono);
+      font-weight:700;font-size:16px;font-variant-numeric:tabular-nums}
+  </style>
+</head>
+<body>
+
+<nav class="navbar">
+  <div class="nav-inner">
+    <div class="brand">
+      <div class="brand-mark">⚽</div><span>Площадка</span>
+    </div>
+    <div class="nav-links">
+      <a href="/index.html" class="nav-link">Площадки</a>
+      <a href="/bookings.html" class="nav-link">Мои брони</a>
+    </div>
+    <div class="nav-actions">
+      <span id="userBadge" style="font-size:14px;color:var(--fb-text-muted)"></span>
+    </div>
+  </div>
+</nav>
+
+<div class="page-wrap">
+  <a href="/index.html" class="btn btn-ghost btn-sm" style="margin-bottom:20px">← Назад</a>
+
+  <div class="book-layout">
+    <!-- LEFT: field info -->
+    <div>
+      <div class="field-hero" id="fieldHero">
+        <div class="center-line"></div>
+        <div class="field-info">
+          <h2 id="fieldName">Загрузка…</h2>
+          <span class="price" id="fieldPrice"></span>
+        </div>
+      </div>
+      <div style="margin-bottom:16px">
+        <span id="fieldType" class="badge badge-primary"><span class="dot"></span>—</span>
+        <span id="fieldAddr" style="font-size:14px;color:var(--fb-text-muted);margin-left:8px"></span>
+      </div>
+      <p id="fieldDesc" style="font-size:15px;color:var(--fb-text-muted);line-height:1.6"></p>
+    </div>
+
+    <!-- RIGHT: schedule panel -->
+    <div class="schedule-panel">
+      <h3>Свободное время</h3>
+
+      <!-- Date strip -->
+      <div class="date-strip" id="dateStrip"></div>
+
+      <!-- Slots -->
+      <div class="slots-grid" id="slotsGrid">
+        <div class="skeleton" style="height:52px;border-radius:8px"></div>
+        <div class="skeleton" style="height:52px;border-radius:8px"></div>
+        <div class="skeleton" style="height:52px;border-radius:8px"></div>
+        <div class="skeleton" style="height:52px;border-radius:8px"></div>
+      </div>
+
+      <!-- Summary -->
+      <div class="slot-summary" id="slotSummary" style="display:none">
+        <div class="row"><span>Время</span><span id="summTime" style="font-weight:600"></span></div>
+        <div class="row"><span>Дата</span><span id="summDate" style="font-weight:600"></span></div>
+        <div class="row" style="margin-bottom:0;padding-top:10px;border-top:1px solid var(--fb-border)">
+          <span style="font-weight:600">Итого</span>
+          <span class="total" id="summTotal"></span>
+        </div>
+      </div>
+
+      <div class="alert alert-danger" id="bookError"></div>
+
+      <button class="btn btn-primary" id="bookBtn" style="width:100%" disabled>
+        Забронировать
+      </button>
+    </div>
+  </div>
+</div>
+
+<div class="toast-container" id="toastContainer"></div>
+<div class="pitch-strip"></div>
+
+<!-- CONFIRM MODAL -->
+<div class="modal-overlay" id="confirmModal">
+  <div class="modal">
+    <h2>Подтвердите бронирование</h2>
+    <p class="modal-sub" id="modalBody"></p>
+    <div class="modal-actions">
+      <button class="btn btn-ghost btn-sm" onclick="closeModal()">Отмена</button>
+      <button class="btn btn-primary btn-sm" id="confirmBtn">Подтвердить</button>
+    </div>
+  </div>
+</div>
+
+<script src="/js/api.js"></script>
+<script>
+const params   = new URLSearchParams(location.search);
+const fieldId  = params.get('fieldId');
+let field      = null;
+let selectedDate = '';
+let selectedSlot = null;
+
+// --- dates ---
+function buildDates() {
+  const strip = document.getElementById('dateStrip');
+  const days  = ['Вс','Пн','Вт','Ср','Чт','Пт','Сб'];
+  const months= ['янв','фев','мар','апр','май','июн','июл','авг','сен','окт','ноя','дек'];
+  strip.innerHTML = '';
+  for (let i = 0; i < 8; i++) {
+    const d   = new Date(); d.setDate(d.getDate() + i);
+    const iso = d.toISOString().slice(0, 10);
+    const chip = document.createElement('div');
+    chip.className = 'date-chip' + (i === 0 ? ' active' : '');
+    chip.innerHTML = `<span class="day">${days[d.getDay()]}</span><span class="num">${d.getDate()}</span>`;
+    chip.title = `${d.getDate()} ${months[d.getMonth()]}`;
+    chip.addEventListener('click', () => {
+      document.querySelectorAll('.date-chip').forEach(c => c.classList.remove('active'));
+      chip.classList.add('active');
+      selectedDate = iso;
+      selectedSlot = null;
+      resetSummary();
+      loadSlots();
+    });
+    if (i === 0) selectedDate = iso;
+    strip.appendChild(chip);
+  }
+}
+
+async function loadField() {
+  try {
+    field = await api.get(`/api/fields/${fieldId}`);
+    document.getElementById('fieldName').textContent  = field.name;
+    document.getElementById('fieldPrice').textContent = `${Math.round(field.pricePerHour)} ₽/час`;
+    document.getElementById('fieldAddr').textContent  = field.address + (field.city ? ', ' + field.city : '');
+    document.getElementById('fieldDesc').textContent  = field.description || '';
+    const typeMap = {FOOTBALL:'Футбол',BASKETBALL:'Баскетбол',VOLLEYBALL:'Волейбол',
+      TENNIS:'Теннис',PADEL:'Падел',HOCKEY:'Хоккей',INDOOR:'Крытый',OUTDOOR:'Открытый'};
+    document.getElementById('fieldType').innerHTML =
+      `<span class="dot"></span>${typeMap[field.fieldType] || field.fieldType}`;
+    document.title = `${field.name} — Площадка`;
+  } catch { showToast('Площадка не найдена', 'error'); }
+}
+
+async function loadSlots() {
+  const grid = document.getElementById('slotsGrid');
+  grid.innerHTML = Array(8).fill(`<div class="skeleton" style="height:52px;border-radius:8px"></div>`).join('');
+  try {
+    const slots = await api.get(`/api/fields/${fieldId}/schedule?date=${selectedDate}`);
+    grid.innerHTML = slots.map((s, i) => {
+      const cls = s.available ? 'available' : (new Date(`${selectedDate}T${s.startTime}`) < new Date() ? 'past' : 'booked');
+      return `<div class="slot ${cls}" data-idx="${i}"
+        data-start="${s.startTime}" data-end="${s.endTime}" data-price="${s.price}">
+        ${s.startTime.slice(0,5)}<br><span style="font-size:10px;opacity:.7">${s.endTime.slice(0,5)}</span>
+      </div>`;
+    }).join('');
+
+    grid.querySelectorAll('.slot.available').forEach(el => {
+      el.addEventListener('click', () => {
+        grid.querySelectorAll('.slot.available').forEach(s => s.classList.remove('selected'));
+        el.classList.add('selected');
+        selectedSlot = { start: el.dataset.start, end: el.dataset.end, price: parseFloat(el.dataset.price) };
+        updateSummary();
+      });
+    });
+  } catch { grid.innerHTML = `<p style="color:var(--fb-danger);grid-column:1/-1;font-size:14px">Ошибка загрузки</p>`; }
+}
+
+function updateSummary() {
+  if (!selectedSlot) return;
+  document.getElementById('summTime').textContent  = `${selectedSlot.start.slice(0,5)} – ${selectedSlot.end.slice(0,5)}`;
+  document.getElementById('summDate').textContent  = selectedDate;
+  document.getElementById('summTotal').textContent = `${Math.round(selectedSlot.price)} ₽`;
+  document.getElementById('slotSummary').style.display = 'block';
+  document.getElementById('bookBtn').disabled = false;
+}
+
+function resetSummary() {
+  document.getElementById('slotSummary').style.display = 'none';
+  document.getElementById('bookBtn').disabled = true;
+}
+
+document.getElementById('bookBtn').addEventListener('click', () => {
+  if (!localStorage.getItem('token')) return location.href = '/login.html';
+  document.getElementById('modalBody').textContent =
+    `${field.name} · ${selectedDate} · ${selectedSlot.start.slice(0,5)}–${selectedSlot.end.slice(0,5)} · ${Math.round(selectedSlot.price)} ₽`;
+  document.getElementById('confirmModal').classList.add('open');
+});
+
+document.getElementById('confirmBtn').addEventListener('click', async () => {
+  const btn = document.getElementById('confirmBtn');
+  btn.disabled = true; btn.textContent = 'Бронируем…';
+  document.getElementById('bookError').classList.remove('show');
+  try {
+    await api.post('/api/bookings', {
+      fieldId: parseInt(fieldId),
+      startTime: `${selectedDate}T${selectedSlot.start}`,
+      endTime:   `${selectedDate}T${selectedSlot.end}`
+    });
+    closeModal();
+    showToast('Бронирование подтверждено!', 'success');
+    setTimeout(() => location.href = '/bookings.html', 1500);
+  } catch (e) {
+    closeModal();
+    document.getElementById('bookError').textContent = e.message || 'Ошибка бронирования';
+    document.getElementById('bookError').classList.add('show');
+    btn.disabled = false; btn.textContent = 'Подтвердить';
+  }
+});
+
+function closeModal() {
+  document.getElementById('confirmModal').classList.remove('open');
+  document.getElementById('confirmBtn').disabled = false;
+  document.getElementById('confirmBtn').textContent = 'Подтвердить';
+}
+
+function showToast(msg, type) {
+  const t = document.createElement('div');
+  t.className = `toast toast-${type}`; t.textContent = msg;
+  document.getElementById('toastContainer').appendChild(t);
+  setTimeout(() => t.classList.add('show'), 10);
+  setTimeout(() => { t.classList.remove('show'); setTimeout(() => t.remove(), 300); }, 3000);
+}
+
+const u = localStorage.getItem('username');
+if (u) document.getElementById('userBadge').textContent = u;
+
+buildDates();
+loadField();
+loadSlots();
+</script>
+</body>
+</html>

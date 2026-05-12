@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Регистрация — Площадка</title>
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body class="auth-page">
+
+<div class="form-card">
+  <div class="logo-row">
+    <div class="logo-mark">⚽</div>
+    <div>
+      <div style="font-weight:700;font-size:18px;letter-spacing:-.01em">Площадка</div>
+      <div style="font-size:12px;color:var(--fb-text-muted)">Создайте аккаунт</div>
+    </div>
+  </div>
+
+  <h1>Регистрация</h1>
+  <p class="sub">Заполните данные для создания аккаунта</p>
+
+  <div class="alert alert-danger" id="errorAlert"></div>
+  <div class="alert alert-success" id="successAlert"></div>
+
+  <form id="regForm">
+    <div class="form-group">
+      <label>Имя пользователя</label>
+      <input class="form-control" id="username" type="text" placeholder="username" required>
+    </div>
+    <div class="form-group">
+      <label>Email</label>
+      <input class="form-control" id="email" type="email" placeholder="you@example.com" required>
+    </div>
+    <div class="form-group">
+      <label>Пароль</label>
+      <input class="form-control" id="password" type="password" placeholder="Минимум 6 символов" required>
+    </div>
+    <div class="form-group">
+      <label>Подтвердите пароль</label>
+      <input class="form-control" id="confirm" type="password" placeholder="••••••••" required>
+    </div>
+    <button class="btn btn-primary" type="submit" style="width:100%;margin-top:8px" id="submitBtn">
+      Создать аккаунт
+    </button>
+  </form>
+
+  <div class="form-footer">
+    Уже есть аккаунт? <a href="/login.html">Войти</a>
+  </div>
+</div>
+<div class="pitch-strip"></div>
+
+<script src="/js/api.js"></script>
+<script>
+document.getElementById('regForm').addEventListener('submit', async e => {
+  e.preventDefault();
+  const btn = document.getElementById('submitBtn');
+  const err = document.getElementById('errorAlert');
+  const ok  = document.getElementById('successAlert');
+  err.classList.remove('show'); ok.classList.remove('show');
+
+  const pass = document.getElementById('password').value;
+  if (pass !== document.getElementById('confirm').value) {
+    err.textContent = 'Пароли не совпадают';
+    return err.classList.add('show');
+  }
+  if (pass.length < 6) {
+    err.textContent = 'Пароль должен быть не короче 6 символов';
+    return err.classList.add('show');
+  }
+
+  btn.disabled = true; btn.textContent = 'Создаём…';
+  try {
+    await api.post('/api/auth/register', {
+      username: document.getElementById('username').value.trim(),
+      email: document.getElementById('email').value.trim(),
+      password: pass
+    });
+    ok.textContent = 'Аккаунт создан! Перенаправляем…';
+    ok.classList.add('show');
+    setTimeout(() => location.href = '/login.html', 1500);
+  } catch (error) {
+    err.textContent = error.message || 'Ошибка регистрации';
+    err.classList.add('show');
+    btn.disabled = false; btn.textContent = 'Создать аккаунт';
+  }
+});
+</script>
+</body>
+</html>

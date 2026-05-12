@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Площадка — Найди поле за минуту</title>
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+
+<!-- NAV -->
+<nav class="navbar">
+  <div class="nav-inner">
+    <div class="brand">
+      <div class="brand-mark">⚽</div>
+      <span>Площадка</span>
+    </div>
+    <div class="nav-links">
+      <a href="/index.html" class="nav-link active">Площадки</a>
+      <a href="/bookings.html" class="nav-link">Мои брони</a>
+    </div>
+    <div class="nav-actions">
+      <a id="profileLink" href="/login.html" class="btn btn-ghost btn-sm">Войти</a>
+    </div>
+  </div>
+</nav>
+
+<!-- MAIN -->
+<div class="page-wrap">
+
+  <!-- HEADER -->
+  <div class="page-header">
+    <h1>Площадки в Москве</h1>
+    <p>Выберите площадку, посмотрите расписание и забронируйте прямо сейчас</p>
+  </div>
+
+  <!-- TOOLBAR -->
+  <div class="toolbar">
+    <input class="search-box" id="searchInput" type="text" placeholder="Поиск по названию или адресу…">
+    <button class="filter-chip active" data-type="">Все</button>
+    <button class="filter-chip" data-type="FOOTBALL">Футбол</button>
+    <button class="filter-chip" data-type="BASKETBALL">Баскетбол</button>
+    <button class="filter-chip" data-type="VOLLEYBALL">Волейбол</button>
+    <button class="filter-chip" data-type="TENNIS">Теннис</button>
+  </div>
+
+  <!-- GRID -->
+  <div class="fields-grid" id="fieldsGrid">
+    <!-- skeletons -->
+    <div class="field-card"><div class="field-pitch"></div>
+      <div class="field-body"><div class="skeleton" style="height:18px;width:70%;margin-bottom:8px"></div>
+        <div class="skeleton" style="height:13px;width:50%"></div></div></div>
+    <div class="field-card"><div class="field-pitch"></div>
+      <div class="field-body"><div class="skeleton" style="height:18px;width:60%;margin-bottom:8px"></div>
+        <div class="skeleton" style="height:13px;width:45%"></div></div></div>
+    <div class="field-card"><div class="field-pitch"></div>
+      <div class="field-body"><div class="skeleton" style="height:18px;width:75%;margin-bottom:8px"></div>
+        <div class="skeleton" style="height:13px;width:55%"></div></div></div>
+  </div>
+
+</div>
+
+<!-- TOAST -->
+<div class="toast-container" id="toastContainer"></div>
+<div class="pitch-strip"></div>
+
+<script src="/js/api.js"></script>
+<script>
+const typeLabels = {
+  FOOTBALL:'Футбол',BASKETBALL:'Баскетбол',VOLLEYBALL:'Волейбол',
+  TENNIS:'Теннис',PADEL:'Падел',HOCKEY:'Хоккей',INDOOR:'Крытый',OUTDOOR:'Открытый'
+};
+
+let allFields = [];
+let activeType = '';
+
+async function init() {
+  // Показать имя юзера если залогинен
+  const username = localStorage.getItem('username');
+  if (username) {
+    document.getElementById('profileLink').textContent = username;
+    document.getElementById('profileLink').href = '/owner.html';
+  }
+
+  try {
+    const data = await api.get('/api/fields?size=40');
+    allFields = data.content || data;
+    renderFields(allFields);
+  } catch (e) {
+    showToast('Ошибка загрузки площадок', 'error');
+  }
+}
+
+function renderFields(fields) {
+  const grid = document.getElementById('fieldsGrid');
+  if (!fields.length) {
+    grid.innerHTML = `<div class="empty-state" style="grid-column:1/-1">
+      <div class="empty-icon">🏟️</div>
+      <h3>Площадки не найдены</h3>
+      <p>Попробуйте изменить фильтры</p></div>`;
+    return;
+  }
+  grid.innerHTML = fields.map(f => `
+    <div class="field-card" onclick="location.href='/book.html?fieldId=${f.id}'">
+      <div class="field-pitch">
+        <div class="center-line"></div>
+        <span class="badge badge-primary field-type-badge">
+          <span class="dot"></span>${typeLabels[f.fieldType] || f.fieldType}
+        </span>
+      </div>
+      <div class="field-body">
+        <div class="field-name">${f.name}</div>
+        <div class="field-addr">📍 ${f.address}${f.city ? ', ' + f.city : ''}</div>
+        <div class="field-footer">
+          <div class="field-price">${Math.round(f.pricePerHour)} <span class="suffix">₽/час</span></div>
+          <button class="btn btn-primary btn-sm">Выбрать время</button>
+        </div>
+      </div>
+    </div>`).join('');
+}
+
+// Фильтры
+document.querySelectorAll('.filter-chip').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.filter-chip').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    activeType = btn.dataset.type;
+    applyFilters();
+  });
+});
+
+document.getElementById('searchInput').addEventListener('input', applyFilters);
+
+function applyFilters() {
+  const q = document.getElementById('searchInput').value.toLowerCase();
+  const filtered = allFields.filter(f => {
+    const matchType = !activeType || f.fieldType === activeType;
+    const matchSearch = !q || f.name.toLowerCase().includes(q) || f.address.toLowerCase().includes(q);
+    return matchType && matchSearch;
+  });
+  renderFields(filtered);
+}
+
+function showToast(msg, type = 'success') {
+  const t = document.createElement('div');
+  t.className = `toast toast-${type}`;
+  t.textContent = msg;
+  document.getElementById('toastContainer').appendChild(t);
+  setTimeout(() => t.classList.add('show'), 10);
+  setTimeout(() => { t.classList.remove('show'); setTimeout(() => t.remove(), 300); }, 3000);
+}
+
+init();
+</script>
+</body>
+</html>

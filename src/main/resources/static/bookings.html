@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Мои брони — Площадка</title>
+  <link rel="stylesheet" href="/css/style.css">
+  <style>
+    .bookings-list{display:flex;flex-direction:column;gap:12px;max-width:700px}
+  </style>
+</head>
+<body>
+<nav class="navbar">
+  <div class="nav-inner">
+    <div class="brand"><div class="brand-mark">⚽</div><span>Площадка</span></div>
+    <div class="nav-links">
+      <a href="/index.html" class="nav-link">Площадки</a>
+      <a href="/bookings.html" class="nav-link active">Мои брони</a>
+    </div>
+    <div class="nav-actions">
+      <span id="userBadge" style="font-size:14px;color:var(--fb-text-muted)"></span>
+      <button class="btn btn-ghost btn-sm" onclick="logout()">Выйти</button>
+    </div>
+  </div>
+</nav>
+
+<div class="page-wrap">
+  <div class="page-header">
+    <h1>Мои бронирования</h1>
+    <p>История и статус ваших броней</p>
+  </div>
+
+  <div class="bookings-list" id="bookingsList">
+    <div class="skeleton" style="height:100px;border-radius:14px"></div>
+    <div class="skeleton" style="height:100px;border-radius:14px"></div>
+  </div>
+</div>
+
+<div class="toast-container" id="toastContainer"></div>
+<div class="pitch-strip"></div>
+
+<!-- Cancel modal -->
+<div class="modal-overlay" id="cancelModal">
+  <div class="modal">
+    <h2>Отменить бронирование?</h2>
+    <p class="modal-sub">Это действие нельзя отменить.</p>
+    <div class="modal-actions">
+      <button class="btn btn-ghost btn-sm" onclick="document.getElementById('cancelModal').classList.remove('open')">Назад</button>
+      <button class="btn btn-danger btn-sm" id="cancelConfirmBtn">Отменить бронь</button>
+    </div>
+  </div>
+</div>
+
+<script src="/js/api.js"></script>
+<script>
+const statusMap = {
+  CONFIRMED: ['badge-primary','Подтверждена'],
+  PENDING:   ['badge-neutral','Ожидает'],
+  CANCELLED: ['badge-danger','Отменена'],
+  COMPLETED: ['badge-info','Завершена']
+};
+
+let pendingCancelId = null;
+
+async function load() {
+  if (!localStorage.getItem('token')) return location.href = '/login.html';
+  const list = document.getElementById('bookingsList');
+  try {
+    const data = await api.get('/api/bookings/my?size=50');
+    const items = data.content || data;
+    if (!items.length) {
+      list.innerHTML = `<div class="empty-state">
+        <div class="empty-icon">📋</div>
+        <h3>Броней пока нет</h3>
+        <p>Выберите площадку и забронируйте время</p>
+        <a href="/index.html" class="btn btn-primary" style="margin-top:20px">Найти площадку</a>
+      </div>`;
+      return;
+    }
+    list.innerHTML = items.map(b => {
+      const [badgeCls, label] = statusMap[b.status] || ['badge-neutral', b.status];
+      const date  = b.startTime.slice(0,10);
+      const start = b.startTime.slice(11,16);
+      const end   = b.endTime.slice(11,16);
+      const canCancel = b.status === 'CONFIRMED';
+      return `<div class="booking-card">
+        <div class="bc-top">
+          <div>
+            <div class="bc-name">${b.fieldName}</div>
+            <div class="bc-time" style="margin-top:4px">${date} &nbsp; ${start} – ${end}</div>
+          </div>
+          <span class="badge ${badgeCls}"><span class="dot"></span>${label}</span>
+        </div>
+        <div class="bc-bottom">
+          <span class="bc-price">${Math.round(b.totalPrice)} ₽</span>
+          ${canCancel ? `<button class="btn btn-ghost btn-xs" style="color:var(--fb-danger);border-color:var(--fb-danger-soft)" onclick="openCancel(${b.id})">Отменить</button>` : ''}
+        </div>
+      </div>`;
+    }).join('');
+  } catch (e) {
+    list.innerHTML = `<p style="color:var(--fb-danger)">Ошибка загрузки. <a href="/login.html">Войдите</a></p>`;
+  }
+}
+
+function openCancel(id) {
+  pendingCancelId = id;
+  document.getElementById('cancelModal').classList.add('open');
+}
+
+document.getElementById('cancelConfirmBtn').addEventListener('click', async () => {
+  const btn = document.getElementById('cancelConfirmBtn');
+  btn.disabled = true; btn.textContent = 'Отменяем…';
+  try {
+    await api.put(`/api/bookings/${pendingCancelId}/cancel`);
+    document.getElementById('cancelModal').classList.remove('open');
+    showToast('Бронирование отменено');
+    load();
+  } catch (e) {
+    showToast(e.message || 'Ошибка', 'error');
+  } finally {
+    btn.disabled = false; btn.textContent = 'Отменить бронь';
+  }
+});
+
+function logout() {
+  localStorage.clear(); location.href = '/login.html';
+}
+
+function showToast(msg, type = 'success') {
+  const t = document.createElement('div');
+  t.className = `toast toast-${type}`; t.textContent = msg;
+  document.getElementById('toastContainer').appendChild(t);
+  setTimeout(() => t.classList.add('show'), 10);
+  setTimeout(() => { t.classList.remove('show'); setTimeout(() => t.remove(), 300); }, 3000);
+}
+
+const u = localStorage.getItem('username');
+if (u) document.getElementById('userBadge').textContent = u;
+load();
+</script>
+</body>
+</html>

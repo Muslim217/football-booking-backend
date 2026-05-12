@@ -1,0 +1,302 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Владелец — Stadium</title>
+  <link rel="preconnect" href="https://api.fontshare.com">
+  <link href="https://api.fontshare.com/v2/css?f[]=satoshi@700,500,400&f[]=general-sans@400,500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css">
+  <style>
+    .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: var(--space-4); margin-bottom: var(--space-6); }
+    .stat-card { background: var(--color-surface); border-radius: var(--radius-md); padding: var(--space-5); box-shadow: var(--shadow-card); }
+    .stat-value { font-family: var(--font-display); font-size: 2rem; font-weight: 700; color: var(--color-primary); line-height: 1; margin-bottom: var(--space-1); font-variant-numeric: tabular-nums; }
+    .stat-label { font-size: 0.8125rem; color: var(--color-text-muted); }
+    .section-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: var(--space-4); }
+    .section-title { font-family: var(--font-display); font-size: 1.125rem; font-weight: 700; color: var(--color-text); }
+    .fields-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: var(--space-4); margin-bottom: var(--space-8); }
+    .field-manage-card { background: var(--color-surface); border-radius: var(--radius-md); box-shadow: var(--shadow-card); overflow: hidden; }
+    .field-manage-pitch { height: 100px; position: relative; }
+    .field-manage-body { padding: var(--space-4); }
+    .field-manage-name { font-family: var(--font-display); font-weight: 700; font-size: 1rem; color: var(--color-text); margin-bottom: var(--space-1); }
+    .field-manage-meta { font-size: 0.8125rem; color: var(--color-text-muted); margin-bottom: var(--space-3); }
+    .field-manage-actions { display: flex; gap: var(--space-2); }
+    .table-wrap { background: var(--color-surface); border-radius: var(--radius-md); box-shadow: var(--shadow-card); overflow: hidden; }
+    table { width: 100%; border-collapse: collapse; }
+    thead { background: var(--color-bg); }
+    th { padding: var(--space-3) var(--space-4); text-align: left; font-size: 0.75rem; font-weight: 600; color: var(--color-text-muted); letter-spacing: .05em; text-transform: uppercase; }
+    td { padding: var(--space-3) var(--space-4); font-size: 0.875rem; color: var(--color-text); border-top: 1px solid var(--color-border); font-variant-numeric: tabular-nums; }
+    tr:hover td { background: var(--color-bg); }
+    .action-btn { background: none; border: none; cursor: pointer; padding: var(--space-1) var(--space-2); border-radius: var(--radius-sm); font-size: 0.8125rem; font-weight: 500; transition: background .15s; }
+    .action-btn.cancel { color: var(--color-danger); }
+    .action-btn.cancel:hover { background: #fef2f2; }
+    .empty-state { text-align: center; padding: var(--space-10) var(--space-4); color: var(--color-text-muted); font-size: 0.9375rem; }
+    /* Modal */
+    .modal-overlay { position: fixed; inset: 0; background: rgba(23,33,23,.45); display: flex; align-items: center; justify-content: center; z-index: 100; padding: var(--space-4); opacity: 0; pointer-events: none; transition: opacity .2s; }
+    .modal-overlay.open { opacity: 1; pointer-events: all; }
+    .modal { background: var(--color-surface); border-radius: var(--radius-lg); padding: var(--space-6); max-width: 440px; width: 100%; box-shadow: 0 24px 64px rgba(23,33,23,.18); }
+    .modal-title { font-family: var(--font-display); font-size: 1.125rem; font-weight: 700; margin-bottom: var(--space-5); color: var(--color-text); }
+  </style>
+</head>
+<body>
+  <nav class="navbar">
+    <a class="navbar-brand" href="index.html">Stadium</a>
+    <div class="navbar-links">
+      <span class="badge badge-info" style="font-size:.75rem; padding: 4px 10px;">Владелец</span>
+      <a href="index.html" class="nav-link">Каталог</a>
+      <button class="btn btn-ghost btn-sm" id="logoutBtn">Выйти</button>
+    </div>
+  </nav>
+
+  <main class="container" style="padding-top: var(--space-6); padding-bottom: var(--space-10);">
+    <div style="margin-bottom: var(--space-6);">
+      <h1 class="page-title">Мои поля</h1>
+      <p style="color: var(--color-text-muted); font-size: .9375rem; margin-top: var(--space-1);">Управление полями и бронированиями</p>
+    </div>
+
+    <!-- Stats -->
+    <div class="stats-grid">
+      <div class="stat-card">
+        <div class="stat-value" id="myFieldsCount">—</div>
+        <div class="stat-label">Моих полей</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value" id="myBookingsCount">—</div>
+        <div class="stat-label">Бронирований сегодня</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value" id="pendingCount">—</div>
+        <div class="stat-label">Ожидают подтверждения</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value" id="monthRevenue">—</div>
+        <div class="stat-label">Доход за месяц</div>
+      </div>
+    </div>
+
+    <!-- My Fields -->
+    <div class="section-header">
+      <span class="section-title">Поля</span>
+      <button class="btn btn-primary btn-sm" id="addFieldBtn">+ Добавить поле</button>
+    </div>
+    <div class="fields-grid" id="fieldsGrid">
+      <div style="color:var(--color-text-muted); font-size:.875rem;">Загрузка...</div>
+    </div>
+
+    <!-- Bookings for my fields -->
+    <div class="section-header">
+      <span class="section-title">Бронирования на мои поля</span>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>Клиент</th>
+            <th>Поле</th>
+            <th>Дата</th>
+            <th>Время</th>
+            <th>Сумма</th>
+            <th>Статус</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody id="bookingsTbody">
+          <tr><td colspan="8" class="empty-state">Загрузка...</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </main>
+
+  <!-- Add Field Modal -->
+  <div class="modal-overlay" id="fieldModal">
+    <div class="modal">
+      <div class="modal-title" id="modalTitle">Добавить поле</div>
+      <form id="fieldForm">
+        <input type="hidden" id="editFieldId">
+        <div class="form-group">
+          <label class="form-label">Название</label>
+          <input class="form-input" id="fieldName" placeholder="Стадион Локомотив" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Тип поля</label>
+          <select class="form-input" id="fieldType">
+            <option value="FOOTBALL">Футбол</option>
+            <option value="BASKETBALL">Баскетбол</option>
+            <option value="VOLLEYBALL">Волейбол</option>
+            <option value="TENNIS">Теннис</option>
+            <option value="PADEL">Падел</option>
+            <option value="HOCKEY">Хоккей</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Город</label>
+          <input class="form-input" id="fieldCity" placeholder="Москва" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Адрес</label>
+          <input class="form-input" id="fieldAddress" placeholder="ул. Спортивная 1" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Цена за час (₽)</label>
+          <input class="form-input" id="fieldPrice" type="number" min="0" placeholder="1500" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Описание</label>
+          <textarea class="form-input" id="fieldDesc" rows="2" placeholder="Раздевалки, освещение..."></textarea>
+        </div>
+        <div style="display:flex; gap:var(--space-3); margin-top:var(--space-5);">
+          <button type="submit" class="btn btn-primary" style="flex:1;">Сохранить</button>
+          <button type="button" class="btn btn-ghost" id="cancelModal" style="flex:1;">Отмена</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script src="js/api.js"></script>
+  <script>
+    (function() {
+      const token = localStorage.getItem('token');
+      const role  = localStorage.getItem('role');
+      if (!token || (role !== 'OWNER' && role !== 'ADMIN')) { window.location.href = 'login.html'; }
+    })();
+
+    document.getElementById('logoutBtn').addEventListener('click', () => { localStorage.clear(); window.location.href = 'login.html'; });
+
+    // Modal
+    const modal = document.getElementById('fieldModal');
+    document.getElementById('addFieldBtn').addEventListener('click', () => {
+      document.getElementById('modalTitle').textContent = 'Добавить поле';
+      document.getElementById('fieldForm').reset();
+      document.getElementById('editFieldId').value = '';
+      modal.classList.add('open');
+    });
+    document.getElementById('cancelModal').addEventListener('click', () => modal.classList.remove('open'));
+    modal.addEventListener('click', e => { if (e.target === modal) modal.classList.remove('open'); });
+
+    document.getElementById('fieldForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const id = document.getElementById('editFieldId').value;
+      const body = {
+        name: document.getElementById('fieldName').value,
+        fieldType: document.getElementById('fieldType').value,
+        city: document.getElementById('fieldCity').value,
+        address: document.getElementById('fieldAddress').value,
+        pricePerHour: Number(document.getElementById('fieldPrice').value),
+        description: document.getElementById('fieldDesc').value,
+      };
+      try {
+        if (id) { await apiPut('/api/fields/' + id, body); }
+        else     { await apiPost('/api/fields', body); }
+        modal.classList.remove('open');
+        loadData();
+      } catch(err) { alert('Ошибка: ' + err.message); }
+    });
+
+    function pitchGradient(type) {
+      const t = (type || '').toUpperCase();
+      if (t === 'BASKETBALL') return 'linear-gradient(135deg,#c0722a 0%,#9c5a1c 100%)';
+      if (t === 'TENNIS')     return 'linear-gradient(135deg,#2563a8 0%,#1a4a8a 100%)';
+      if (t === 'VOLLEYBALL') return 'linear-gradient(135deg,#d97706 0%,#b45309 100%)';
+      return 'linear-gradient(160deg,#1B6B2E 0%,#145522 60%,#0f3d18 100%)';
+    }
+
+    function statusBadge(status) {
+      const map = { CONFIRMED: 'badge-primary', PENDING: 'badge-warning', CANCELLED: 'badge-danger', COMPLETED: 'badge-neutral' };
+      const labels = { CONFIRMED: 'Подтверждено', PENDING: 'Ожидание', CANCELLED: 'Отменено', COMPLETED: 'Завершено' };
+      return `<span class="badge ${map[status] || 'badge-neutral'}">${labels[status] || status}</span>`;
+    }
+
+    async function loadData() {
+      // Fields
+      try {
+        const data = await apiGet('/api/fields/my');
+        const fields = Array.isArray(data) ? data : (data.content || []);
+        document.getElementById('myFieldsCount').textContent = fields.length;
+        if (!fields.length) {
+          document.getElementById('fieldsGrid').innerHTML = `<div class="empty-state" style="grid-column:1/-1">У вас пока нет полей.<br>Добавьте первое!</div>`;
+        } else {
+          document.getElementById('fieldsGrid').innerHTML = fields.map(f => `
+            <div class="field-manage-card">
+              <div class="field-manage-pitch" style="background:${pitchGradient(f.fieldType || f.type)};">
+                <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;">
+                  <div style="width:60%;height:60%;border:2px solid rgba(255,255,255,.35);border-radius:4px;"></div>
+                  <div style="position:absolute;width:28%;height:28%;border:2px solid rgba(255,255,255,.25);border-radius:50%;"></div>
+                </div>
+              </div>
+              <div class="field-manage-body">
+                <div class="field-manage-name">${f.name}</div>
+                <div class="field-manage-meta">${f.city || ''} · ${f.pricePerHour} ₽/ч</div>
+                <div class="field-manage-actions">
+                  <button class="btn btn-ghost btn-sm" onclick='editField(${JSON.stringify(f)})'>Редактировать</button>
+                  <button class="btn btn-ghost btn-sm" style="color:var(--color-danger)" onclick="deleteField(${f.id})">Удалить</button>
+                </div>
+              </div>
+            </div>`).join('');
+        }
+      } catch(e) {
+        document.getElementById('fieldsGrid').innerHTML = `<div class="empty-state" style="grid-column:1/-1">Нет данных</div>`;
+      }
+
+      // Bookings for owner's fields
+      try {
+        const data = await apiGet('/api/bookings/owner');
+        const bookings = Array.isArray(data) ? data : (data.content || []);
+        const today = new Date().toISOString().slice(0,10);
+        const todayB = bookings.filter(b => b.date === today);
+        const pending = bookings.filter(b => b.status === 'PENDING');
+        const revenue = bookings.filter(b => b.status === 'CONFIRMED' || b.status === 'COMPLETED')
+          .reduce((s, b) => s + (b.totalPrice || 0), 0);
+        document.getElementById('myBookingsCount').textContent = todayB.length;
+        document.getElementById('pendingCount').textContent = pending.length;
+        document.getElementById('monthRevenue').textContent = revenue.toLocaleString('ru') + ' ₽';
+
+        document.getElementById('bookingsTbody').innerHTML = bookings.length ? bookings.map(b => `
+          <tr>
+            <td>${b.id}</td>
+            <td>${b.userName || '—'}</td>
+            <td>${b.fieldName || '—'}</td>
+            <td>${b.date || '—'}</td>
+            <td>${b.startTime || '—'} – ${b.endTime || '—'}</td>
+            <td>${b.totalPrice != null ? b.totalPrice.toLocaleString('ru') + ' ₽' : '—'}</td>
+            <td>${statusBadge(b.status)}</td>
+            <td>
+              ${b.status === 'PENDING' ? `<button class="action-btn confirm" style="color:var(--color-primary)" onclick="confirmBooking(${b.id})">Подтвердить</button>` : ''}
+              ${b.status === 'CONFIRMED' ? `<button class="action-btn cancel" onclick="cancelBooking(${b.id})">Отменить</button>` : ''}
+            </td>
+          </tr>`).join('') : `<tr><td colspan="8" class="empty-state">Бронирований нет</td></tr>`;
+      } catch(e) {
+        document.getElementById('bookingsTbody').innerHTML = `<tr><td colspan="8" class="empty-state">Нет данных</td></tr>`;
+      }
+    }
+
+    function editField(f) {
+      document.getElementById('modalTitle').textContent = 'Редактировать поле';
+      document.getElementById('editFieldId').value = f.id;
+      document.getElementById('fieldName').value = f.name || '';
+      document.getElementById('fieldType').value = f.fieldType || f.type || 'FOOTBALL';
+      document.getElementById('fieldCity').value = f.city || '';
+      document.getElementById('fieldAddress').value = f.address || '';
+      document.getElementById('fieldPrice').value = f.pricePerHour || '';
+      document.getElementById('fieldDesc').value = f.description || '';
+      modal.classList.add('open');
+    }
+
+    async function deleteField(id) {
+      if (!confirm('Удалить поле #' + id + '?')) return;
+      try { await apiDelete('/api/fields/' + id); loadData(); } catch(e) { alert('Ошибка: ' + e.message); }
+    }
+
+    async function confirmBooking(id) {
+      try { await apiPatch('/api/bookings/' + id + '/confirm'); loadData(); } catch(e) { alert('Ошибка: ' + e.message); }
+    }
+
+    async function cancelBooking(id) {
+      if (!confirm('Отменить бронирование #' + id + '?')) return;
+      try { await apiDelete('/api/bookings/' + id); loadData(); } catch(e) { alert('Ошибка: ' + e.message); }
+    }
+
+    loadData();
+  </script>
+</body>
+</html>

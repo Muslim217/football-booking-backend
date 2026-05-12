@@ -53,6 +53,9 @@ public class SecurityConfig {
                 .requestMatchers("/h2-console/**").permitAll()
                 // Статика (фронтенд, если нужно)
                 .requestMatchers("/", "/*.html", "/css/**", "/js/**").permitAll()
+                // Actuator: health & info публичны, остальные — только ADMIN
+                .requestMatchers("/actuator/health/**", "/actuator/info").permitAll()
+                .requestMatchers("/actuator/**").hasRole("ADMIN")
                 // Всё остальное — только авторизованным
                 .anyRequest().authenticated()
             )

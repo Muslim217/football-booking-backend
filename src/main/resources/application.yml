@@ -21,6 +21,28 @@ app:
     requests-per-minute: 60
   base-url: ${BASE_URL:http://localhost:8080}
 
+# Spring Boot Actuator — monitoring & health
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,loggers
+      base-path: /actuator
+  endpoint:
+    health:
+      show-details: when-authorized   # Full details only for ADMIN
+      probes:
+        enabled: true                 # /actuator/health/liveness + /readiness
+  info:
+    env:
+      enabled: true
+
+info:
+  app:
+    name: football-booking-backend
+    description: Football field booking system API
+    version: 1.0.0
+
 ---
 # Dev Profile (H2 Database)
 spring:

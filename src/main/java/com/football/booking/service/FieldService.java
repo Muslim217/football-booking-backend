@@ -11,15 +11,16 @@ import com.football.booking.enums.Role;
 import com.football.booking.exception.AccessDeniedException;
 import com.football.booking.exception.ResourceNotFoundException;
 import com.football.booking.repository.BookingRepository;
+import com.football.booking.repository.FavoriteRepository;
 import com.football.booking.repository.FieldRepository;
 import com.football.booking.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
 import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -28,67 +29,52 @@ import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
 public class FieldService {
 
-    // Рабочие часы площадок: с 08:00 до 23:00, слоты по 1 часу
+    // Рабочие часы: 08:00 – 23:00, слоты по 1 часу
     private static final LocalTime OPEN_TIME  = LocalTime.of(8, 0);
     private static final LocalTime CLOSE_TIME = LocalTime.of(23, 0);
 
     private final FieldRepository fieldRepository;
     private final UserRepository userRepository;
     private final BookingRepository bookingRepository;
+    private final FavoriteRepository favoriteRepository;
+    private final PhotoStorageService photoStorageService;
 
     // === Публичные методы ===
 
-    public Page<FieldResponse> getAllActiveFields(Pageable pageable, String type, String search) {
-        // Если фильтры не заданы — стандартный запрос с пагинацией на уровне БД
-        if ((type == null || type.isBlank()) && (search == null || search.isBlank())) {
-            return fieldRepository.findByIsActiveTrue(pageable)
-                    .map(this::mapToResponse);
-        }
-
-        // Если фильтры заданы — загружаем все активные и фильтруем в памяти
+    public Page<FieldResponse> getAllActiveFields(Pageable pageable, String type, String search,
+                                                  Authentication authentication) {
         FieldType fieldTypeFilter = null;
         if (type != null && !type.isBlank()) {
             try {
                 fieldTypeFilter = FieldType.valueOf(type.toUpperCase());
             } catch (IllegalArgumentException ignored) {
-                // Неизвестный тип — вернём пустую страницу
                 return Page.empty(pageable);
             }
         }
 
-        final FieldType finalFieldTypeFilter = fieldTypeFilter;
-        final String lowerSearch = (search != null && !search.isBlank()) ? search.toLowerCase() : null;
+        String searchFilter = (search != null && !search.isBlank()) ? search.trim() : null;
 
-        List<Field> all = fieldRepository.findByIsActiveTrue();
-        List<FieldResponse> filtered = all.stream()
-                .filter(f -> finalFieldTypeFilter == null || f.getFieldType() == finalFieldTypeFilter)
-                .filter(f -> lowerSearch == null
-                        || (f.getName() != null && f.getName().toLowerCase().contains(lowerSearch))
-                        || (f.getAddress() != null && f.getAddress().toLowerCase().contains(lowerSearch)))
-                .map(this::mapToResponse)
-                .collect(Collectors.toList());
+        // Теперь фильтрация полностью на уровне БД через @Query
+        Page<Field> fields = fieldRepository.findActiveWithFilters(fieldTypeFilter, searchFilter, pageable);
 
-        int start = (int) pageable.getOffset();
-        int end = Math.min(start + pageable.getPageSize(), filtered.size());
-        List<FieldResponse> pageContent = start >= filtered.size() ? List.of() : filtered.subList(start, end);
-        return new PageImpl<>(pageContent, pageable, filtered.size());
+        Long userId = resolveUserId(authentication);
+        return fields.map(f -> mapToResponse(f, userId));
     }
 
-    public FieldResponse getFieldById(Long id) {
+    public FieldResponse getFieldById(Long id, Authentication authentication) {
         Field field = fieldRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Поле не найдено с ID: " + id));
-        return mapToResponse(field);
+        Long userId = resolveUserId(authentication);
+        return mapToResponse(field, userId);
     }
 
     /**
-     * Возвращает список слотов (по 1 часу) на указанную дату.
-     * Каждый слот помечен: available=true/false
+     * Расписание на день: список 1-часовых слотов с признаком доступности
      */
     public List<TimeSlotResponse> getSchedule(Long fieldId, LocalDate date) {
         Field field = fieldRepository.findById(fieldId)
@@ -97,7 +83,6 @@ public class FieldService {
         LocalDateTime dayStart = date.atTime(OPEN_TIME);
         LocalDateTime dayEnd   = date.atTime(CLOSE_TIME);
 
-        // Все активные бронирования на этот день
         List<Booking> bookings = bookingRepository.findConflictingBookings(fieldId, dayStart, dayEnd);
 
         List<TimeSlotResponse> slots = new ArrayList<>();
@@ -106,18 +91,14 @@ public class FieldService {
 
         while (cursor.isBefore(CLOSE_TIME)) {
             LocalTime slotEnd = cursor.plusHours(1);
-            LocalDateTime slotStart_dt = date.atTime(cursor);
-            LocalDateTime slotEnd_dt   = date.atTime(slotEnd);
+            LocalDateTime slotStartDt = date.atTime(cursor);
+            LocalDateTime slotEndDt   = date.atTime(slotEnd);
 
             boolean isBooked = bookings.stream().anyMatch(b ->
-                    b.getStartTime().isBefore(slotEnd_dt) &&
-                    b.getEndTime().isAfter(slotStart_dt));
+                    b.getStartTime().isBefore(slotEndDt) && b.getEndTime().isAfter(slotStartDt));
+            boolean isPast   = slotStartDt.isBefore(now);
 
-            // Прошедшие слоты тоже недоступны
-            boolean isPast = slotStart_dt.isBefore(now);
-
-            BigDecimal slotPrice = field.getPricePerHour()
-                    .setScale(2, RoundingMode.HALF_UP);
+            BigDecimal slotPrice = field.getPricePerHour().setScale(2, RoundingMode.HALF_UP);
 
             slots.add(TimeSlotResponse.builder()
                     .startTime(cursor)
@@ -128,7 +109,6 @@ public class FieldService {
 
             cursor = slotEnd;
         }
-
         return slots;
     }
 
@@ -137,7 +117,7 @@ public class FieldService {
     public Page<FieldResponse> getMyFields(Authentication authentication, Pageable pageable) {
         User owner = getAuthenticatedUser(authentication);
         return fieldRepository.findByOwnerId(owner.getId(), pageable)
-                .map(this::mapToResponse);
+                .map(f -> mapToResponse(f, owner.getId()));
     }
 
     @Transactional
@@ -160,7 +140,7 @@ public class FieldService {
                 .isActive(true)
                 .build();
 
-        return mapToResponse(fieldRepository.save(field));
+        return mapToResponse(fieldRepository.save(field), owner.getId());
     }
 
     @Transactional
@@ -180,7 +160,27 @@ public class FieldService {
             field.setPhotoUrl(request.getPhotoUrl());
         }
 
-        return mapToResponse(fieldRepository.save(field));
+        User user = getAuthenticatedUser(authentication);
+        return mapToResponse(fieldRepository.save(field), user.getId());
+    }
+
+    @Transactional
+    public FieldResponse uploadPhoto(Long id, MultipartFile file, Authentication authentication) {
+        Field field = fieldRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Поле не найдено с ID: " + id));
+
+        checkOwnership(field, authentication);
+
+        // Удаляем старое фото если есть
+        if (field.getPhotoUrl() != null) {
+            photoStorageService.delete(field.getPhotoUrl());
+        }
+
+        String photoUrl = photoStorageService.store(file);
+        field.setPhotoUrl(photoUrl);
+
+        User user = getAuthenticatedUser(authentication);
+        return mapToResponse(fieldRepository.save(field), user.getId());
     }
 
     @Transactional
@@ -201,23 +201,19 @@ public class FieldService {
         fieldRepository.save(field);
     }
 
-    // === Вспомогательные методы ===
+    // === Вспомогательные ===
 
-    private User getAuthenticatedUser(Authentication authentication) {
-        return userRepository.findByUsername(authentication.getName())
-                .orElseThrow(() -> new ResourceNotFoundException("Пользователь не найден"));
+    /**
+     * Публичный маппер без персонализации — используется FavoriteService и другими сервисами
+     */
+    public FieldResponse mapToResponsePublic(Field field) {
+        return mapToResponse(field, null);
     }
 
-    private void checkOwnership(Field field, Authentication authentication) {
-        User user = getAuthenticatedUser(authentication);
-        boolean isAdmin = user.getRole() == Role.ADMIN;
-        boolean isOwner = field.getOwner().getId().equals(user.getId());
-        if (!isOwner && !isAdmin) {
-            throw new AccessDeniedException("Вы можете управлять только своими полями");
-        }
-    }
+    private FieldResponse mapToResponse(Field field, Long currentUserId) {
+        boolean isFavorite = currentUserId != null &&
+                favoriteRepository.existsByUserIdAndFieldId(currentUserId, field.getId());
 
-    private FieldResponse mapToResponse(Field field) {
         return FieldResponse.builder()
                 .id(field.getId())
                 .name(field.getName())
@@ -230,6 +226,31 @@ public class FieldService {
                 .isActive(field.getIsActive())
                 .ownerUsername(field.getOwner().getUsername())
                 .createdAt(field.getCreatedAt())
+                .avgRating(field.getAvgRating())
+                .reviewCount(field.getReviewCount())
+                .favoriteCount(field.getFavoriteCount())
+                .isFavorite(isFavorite)
                 .build();
+    }
+
+    private User getAuthenticatedUser(Authentication authentication) {
+        return userRepository.findByUsername(authentication.getName())
+                .orElseThrow(() -> new ResourceNotFoundException("Пользователь не найден"));
+    }
+
+    private Long resolveUserId(Authentication authentication) {
+        if (authentication == null || !authentication.isAuthenticated()) return null;
+        return userRepository.findByUsername(authentication.getName())
+                .map(User::getId)
+                .orElse(null);
+    }
+
+    private void checkOwnership(Field field, Authentication authentication) {
+        User user = getAuthenticatedUser(authentication);
+        boolean isAdmin = user.getRole() == Role.ADMIN;
+        boolean isOwner = field.getOwner().getId().equals(user.getId());
+        if (!isOwner && !isAdmin) {
+            throw new AccessDeniedException("Вы можете управлять только своими полями");
+        }
     }
 }

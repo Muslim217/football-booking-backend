@@ -1,0 +1,14 @@
+# Не включать в Docker-контекст
+target/
+.git/
+.gitignore
+*.md
+data/
+uploads/
+.env
+*.log
+
+# IDE
+.idea/
+*.iml
+.vscode/

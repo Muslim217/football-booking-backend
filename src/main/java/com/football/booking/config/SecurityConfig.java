@@ -1,6 +1,7 @@
 package com.football.booking.config;
 
 import com.football.booking.security.JwtAuthFilter;
+import com.football.booking.security.RateLimitFilter;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -29,6 +30,7 @@ import java.util.List;
 public class SecurityConfig {
 
     private final JwtAuthFilter jwtAuthFilter;
+    private final RateLimitFilter rateLimitFilter;
 
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
@@ -37,32 +39,36 @@ public class SecurityConfig {
             .csrf(AbstractHttpConfigurer::disable)
             .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .authorizeHttpRequests(auth -> auth
-                // Публичные эндпоинты
+                // Авторизация
                 .requestMatchers("/api/auth/**").permitAll()
-                .requestMatchers(HttpMethod.GET, "/api/fields", "/api/fields/{id}", "/api/fields/{id}/schedule").permitAll()
-                .requestMatchers(HttpMethod.GET, "/api/bookings/field/**").permitAll()
+                // Публичные GET-эндпоинты площадок
+                .requestMatchers(HttpMethod.GET, "/api/fields", "/api/fields/{id}",
+                        "/api/fields/{id}/schedule").permitAll()
+                // Публичные отзывы (только чтение)
+                .requestMatchers(HttpMethod.GET, "/api/reviews/field/**").permitAll()
+                // Статические файлы (загруженные фото)
+                .requestMatchers("/uploads/**").permitAll()
                 // Swagger / H2
                 .requestMatchers("/swagger-ui/**", "/v3/api-docs/**", "/swagger-ui.html").permitAll()
                 .requestMatchers("/h2-console/**").permitAll()
-                // Статика
+                // Статика (фронтенд, если нужно)
                 .requestMatchers("/", "/*.html", "/css/**", "/js/**").permitAll()
                 // Всё остальное — только авторизованным
                 .anyRequest().authenticated()
             )
+            // Rate limiter перед JWT-фильтром
+            .addFilterBefore(rateLimitFilter, UsernamePasswordAuthenticationFilter.class)
             .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
     }
 
-    /**
-     * CORS — разрешаем мобильному клиенту и локальной разработке обращаться к API.
-     * В продакшне замени allowedOriginPatterns на конкретный домен.
-     */
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration config = new CorsConfiguration();
-        config.setAllowedOriginPatterns(List.of("*")); // для dev; в prod укажи конкретный домен
-        config.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
+        // В продакшне замени на конкретный домен/origin мобильного приложения
+        config.setAllowedOriginPatterns(List.of("*"));
+        config.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"));
         config.setAllowedHeaders(List.of("*"));
         config.setAllowCredentials(true);
         config.setMaxAge(3600L);

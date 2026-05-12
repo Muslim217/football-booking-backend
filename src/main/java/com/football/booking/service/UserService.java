@@ -1,12 +1,15 @@
 package com.football.booking.service;
 
+import com.football.booking.dto.request.ChangePasswordRequest;
 import com.football.booking.dto.request.UpdateProfileRequest;
+import com.football.booking.dto.response.MessageResponse;
 import com.football.booking.dto.response.UserProfileResponse;
 import com.football.booking.entity.User;
 import com.football.booking.exception.ResourceNotFoundException;
 import com.football.booking.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.Authentication;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -15,6 +18,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class UserService {
 
     private final UserRepository userRepository;
+    private final PasswordEncoder passwordEncoder;
 
     public UserProfileResponse getMyProfile(Authentication authentication) {
         User user = getAuthenticatedUser(authentication);
@@ -32,8 +36,21 @@ public class UserService {
             user.setPhone(request.getPhone());
         }
 
-        User updated = userRepository.save(user);
-        return mapToResponse(updated);
+        return mapToResponse(userRepository.save(user));
+    }
+
+    @Transactional
+    public MessageResponse changePassword(ChangePasswordRequest request, Authentication authentication) {
+        User user = getAuthenticatedUser(authentication);
+
+        if (!passwordEncoder.matches(request.getCurrentPassword(), user.getPassword())) {
+            throw new IllegalArgumentException("Неверный текущий пароль");
+        }
+
+        user.setPassword(passwordEncoder.encode(request.getNewPassword()));
+        userRepository.save(user);
+
+        return new MessageResponse("Пароль успешно изменён");
     }
 
     private User getAuthenticatedUser(Authentication authentication) {

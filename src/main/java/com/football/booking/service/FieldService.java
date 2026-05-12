@@ -230,6 +230,7 @@ public class FieldService {
                 .reviewCount(field.getReviewCount())
                 .favoriteCount(field.getFavoriteCount())
                 .isFavorite(isFavorite)
+                .ownerVerificationStatus(field.getOwner().getVerificationStatus())
                 .build();
     }
 

@@ -20,6 +20,9 @@ app:
     enabled: true
     requests-per-minute: 60
   base-url: ${BASE_URL:http://localhost:8080}
+  fcm:
+    enabled: ${FCM_ENABLED:false}
+    server-key: ${FCM_SERVER_KEY:}   # FCM Legacy Key из Firebase Console → Project Settings → Cloud Messaging
 
 # Spring Boot Actuator — monitoring & health
 management:

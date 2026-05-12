@@ -83,6 +83,22 @@ public class BookingController {
         return ResponseEntity.ok(bookingService.getOwnerBookings(authentication, pageable));
     }
 
+    @PutMapping("/{id}/confirm")
+    @Operation(summary = "Подтвердить бронирование (OWNER/ADMIN)")
+    public ResponseEntity<BookingResponse> confirmBooking(
+            @PathVariable Long id,
+            Authentication authentication) {
+        return ResponseEntity.ok(bookingService.confirmBooking(id, authentication));
+    }
+
+    @PutMapping("/{id}/reject")
+    @Operation(summary = "Отклонить бронирование (OWNER/ADMIN)")
+    public ResponseEntity<BookingResponse> rejectBooking(
+            @PathVariable Long id,
+            Authentication authentication) {
+        return ResponseEntity.ok(bookingService.rejectBooking(id, authentication));
+    }
+
     @GetMapping("/field/{fieldId}")
     @Operation(summary = "Бронирования по площадке (с пагинацией)")
     public ResponseEntity<Page<BookingResponse>> getBookingsByField(

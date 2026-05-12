@@ -25,6 +25,7 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.Duration;
 import java.util.List;
+import java.util.Map;
 
 @Service
 @RequiredArgsConstructor
@@ -33,6 +34,7 @@ public class BookingService {
     private final BookingRepository bookingRepository;
     private final FieldRepository fieldRepository;
     private final UserRepository userRepository;
+    private final PushNotificationService pushService;
 
     @Transactional
     public BookingResponse createBooking(BookingRequest request, Authentication authentication) {
@@ -71,10 +73,18 @@ public class BookingService {
                 .startTime(request.getStartTime())
                 .endTime(request.getEndTime())
                 .totalPrice(totalPrice)
-                .status(BookingStatus.CONFIRMED)
+                .status(BookingStatus.PENDING)
                 .build();
 
-        return mapToResponse(bookingRepository.save(booking));
+        BookingResponse saved = mapToResponse(bookingRepository.save(booking));
+
+        // Уведомить владельца поля о новом бронировании
+        pushService.notify(field.getOwner().getUsername(),
+                "Новое бронирование",
+                user.getUsername() + " хочет забронировать «" + field.getName() + "»",
+                Map.of("type", "BOOKING_NEW", "bookingId", String.valueOf(saved.getId())));
+
+        return saved;
     }
 
     public Page<BookingResponse> getMyBookings(Authentication authentication, Pageable pageable) {
@@ -119,7 +129,64 @@ public class BookingService {
         }
 
         booking.setStatus(BookingStatus.CANCELLED);
-        return mapToResponse(bookingRepository.save(booking));
+        BookingResponse result = mapToResponse(bookingRepository.save(booking));
+
+        // Уведомить владельца об отмене
+        pushService.notify(booking.getField().getOwner().getUsername(),
+                "Бронирование отменено",
+                booking.getUser().getUsername() + " отменил бронирование «" + booking.getField().getName() + "»",
+                Map.of("type", "BOOKING_CANCELLED", "bookingId", String.valueOf(booking.getId())));
+
+        return result;
+    }
+
+    // ── Подтвердить бронирование (OWNER / ADMIN) ──────────────────
+
+    @Transactional
+    public BookingResponse confirmBooking(Long id, Authentication authentication) {
+        Booking booking = getBookingForOwner(id, authentication);
+        if (booking.getStatus() != BookingStatus.PENDING) {
+            throw new IllegalArgumentException("Бронирование не в статусе ожидания");
+        }
+        booking.setStatus(BookingStatus.CONFIRMED);
+        BookingResponse result = mapToResponse(bookingRepository.save(booking));
+
+        pushService.notify(booking.getUser().getUsername(),
+                "Бронирование подтверждено ✓",
+                "«" + booking.getField().getName() + "» — ваше бронирование подтверждено!",
+                Map.of("type", "BOOKING_CONFIRMED", "bookingId", String.valueOf(id)));
+
+        return result;
+    }
+
+    // ── Отклонить бронирование (OWNER / ADMIN) ────────────────────
+
+    @Transactional
+    public BookingResponse rejectBooking(Long id, Authentication authentication) {
+        Booking booking = getBookingForOwner(id, authentication);
+        if (booking.getStatus() != BookingStatus.PENDING) {
+            throw new IllegalArgumentException("Бронирование не в статусе ожидания");
+        }
+        booking.setStatus(BookingStatus.CANCELLED);
+        BookingResponse result = mapToResponse(bookingRepository.save(booking));
+
+        pushService.notify(booking.getUser().getUsername(),
+                "Бронирование отклонено",
+                "«" + booking.getField().getName() + "» — к сожалению, бронирование отклонено",
+                Map.of("type", "BOOKING_REJECTED", "bookingId", String.valueOf(id)));
+
+        return result;
+    }
+
+    private Booking getBookingForOwner(Long id, Authentication auth) {
+        Booking booking = bookingRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Бронирование не найдено с ID: " + id));
+        boolean isAdmin = auth.getAuthorities().contains(new SimpleGrantedAuthority("ROLE_ADMIN"));
+        boolean isOwner = booking.getField().getOwner().getUsername().equals(auth.getName());
+        if (!isOwner && !isAdmin) {
+            throw new AccessDeniedException("Нет прав для управления этим бронированием");
+        }
+        return booking;
     }
 
     public Page<BookingResponse> getOwnerBookings(Authentication authentication, Pageable pageable) {

@@ -1,6 +1,7 @@
 package com.football.booking.entity;
 
 import com.football.booking.enums.Role;
+import com.football.booking.enums.VerificationStatus;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
@@ -40,6 +41,15 @@ public class User {
 
     @Column(name = "phone")
     private String phone;
+
+    @Column(name = "phone_verified", nullable = false)
+    @Builder.Default
+    private Boolean phoneVerified = false;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "verification_status", nullable = false)
+    @Builder.Default
+    private VerificationStatus verificationStatus = VerificationStatus.UNVERIFIED;
 
     @CreationTimestamp
     @Column(updatable = false)

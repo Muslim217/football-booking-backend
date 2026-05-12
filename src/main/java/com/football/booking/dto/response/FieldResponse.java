@@ -1,6 +1,7 @@
 package com.football.booking.dto.response;
 
 import com.football.booking.enums.FieldType;
+import com.football.booking.enums.VerificationStatus;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -34,4 +35,7 @@ public class FieldResponse {
 
     // Персонализация — добавляется при запросе с аутентификацией
     private Boolean isFavorite;
+
+    // Верификация владельца
+    private VerificationStatus ownerVerificationStatus;
 }

@@ -7,6 +7,8 @@ spring:
     serialization:
       write-dates-as-timestamps: false
     default-property-inclusion: non_null
+  jpa:
+    open-in-view: false   # отключает OSIV — предотвращает LazyInitializationException вне @Transactional
 
 jwt:
   secret: ${JWT_SECRET:dev-secret-key-change-in-production-minimum-32-chars}

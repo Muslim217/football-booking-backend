@@ -29,9 +29,9 @@ public interface FieldRepository extends JpaRepository<Field, Long> {
     @Query("SELECT f FROM Field f WHERE f.isActive = true " +
            "AND (:type IS NULL OR f.fieldType = :type) " +
            "AND (:search IS NULL OR " +
-           "     LOWER(f.name) LIKE LOWER(CONCAT('%', :search, '%')) OR " +
-           "     LOWER(f.address) LIKE LOWER(CONCAT('%', :search, '%')) OR " +
-           "     LOWER(f.city) LIKE LOWER(CONCAT('%', :search, '%')))")
+           "     (LOWER(f.name)    LIKE LOWER(CONCAT('%', :search, '%')) OR " +
+           "      LOWER(f.address) LIKE LOWER(CONCAT('%', :search, '%')) OR " +
+           "      LOWER(f.city)    LIKE LOWER(CONCAT('%', :search, '%'))))")
     Page<Field> findActiveWithFilters(
             @Param("type") FieldType type,
             @Param("search") String search,

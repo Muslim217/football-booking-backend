@@ -51,11 +51,6 @@ public class BookingService {
             throw new IllegalArgumentException("Время окончания должно быть после времени начала");
         }
 
-        long minutes = Duration.between(request.getStartTime(), request.getEndTime()).toMinutes();
-        if (minutes < 60) {
-            throw new IllegalArgumentException("Минимальная продолжительность бронирования — 1 час");
-        }
-
         List<Booking> conflicts = bookingRepository.findConflictingBookings(
                 request.getFieldId(), request.getStartTime(), request.getEndTime());
 
@@ -64,6 +59,7 @@ public class BookingService {
                     "Площадка уже забронирована на указанное время");
         }
 
+        long minutes = Duration.between(request.getStartTime(), request.getEndTime()).toMinutes();
         BigDecimal hours = BigDecimal.valueOf(minutes).divide(BigDecimal.valueOf(60), 2, RoundingMode.HALF_UP);
         BigDecimal totalPrice = field.getPricePerHour().multiply(hours).setScale(2, RoundingMode.HALF_UP);
 

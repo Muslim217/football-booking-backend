@@ -120,8 +120,9 @@ public class AuthService {
 
         User user = storedToken.getUser();
 
-        // Ротация токена — старый удаляем, выдаём новый
-        refreshTokenRepository.delete(storedToken);
+        // Ротация токена — старый отзываем, выдаём новый
+        storedToken.setRevoked(true);
+        refreshTokenRepository.save(storedToken);
 
         String newAccessToken  = jwtTokenProvider.generateAccessToken(user.getUsername());
         String newRefreshToken = createRefreshToken(user);

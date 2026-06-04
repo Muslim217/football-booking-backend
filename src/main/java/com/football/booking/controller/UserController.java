@@ -1,8 +1,6 @@
 package com.football.booking.controller;
 
-import com.football.booking.dto.request.ChangePasswordRequest;
 import com.football.booking.dto.request.UpdateProfileRequest;
-import com.football.booking.dto.response.MessageResponse;
 import com.football.booking.dto.response.UserProfileResponse;
 import com.football.booking.service.UserService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -30,18 +28,10 @@ public class UserController {
     }
 
     @PutMapping("/me")
-    @Operation(summary = "Обновить профиль (имя, телефон)")
+    @Operation(summary = "Обновить мой профиль (имя, телефон)")
     public ResponseEntity<UserProfileResponse> updateMyProfile(
             @Valid @RequestBody UpdateProfileRequest request,
             Authentication authentication) {
         return ResponseEntity.ok(userService.updateMyProfile(request, authentication));
-    }
-
-    @PutMapping("/me/password")
-    @Operation(summary = "Изменить пароль")
-    public ResponseEntity<MessageResponse> changePassword(
-            @Valid @RequestBody ChangePasswordRequest request,
-            Authentication authentication) {
-        return ResponseEntity.ok(userService.changePassword(request, authentication));
     }
 }

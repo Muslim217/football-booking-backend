@@ -1,7 +1,6 @@
 package com.football.booking.dto.response;
 
 import com.football.booking.enums.FieldType;
-import com.football.booking.enums.VerificationStatus;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -27,15 +26,4 @@ public class FieldResponse {
     private Boolean isActive;
     private String ownerUsername;
     private LocalDateTime createdAt;
-
-    // Статистика — вычисляется через @Formula в Field
-    private Double avgRating;
-    private Long reviewCount;
-    private Long favoriteCount;
-
-    // Персонализация — добавляется при запросе с аутентификацией
-    private Boolean isFavorite;
-
-    // Верификация владельца
-    private VerificationStatus ownerVerificationStatus;
 }

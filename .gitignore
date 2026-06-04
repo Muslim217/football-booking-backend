@@ -24,5 +24,3 @@ target/
 ### Logs ###
 *.log
 logs/
-data/
-uploads/

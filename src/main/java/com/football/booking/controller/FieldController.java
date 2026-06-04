@@ -15,11 +15,9 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
-import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
-import org.springframework.web.multipart.MultipartFile;
 
 import java.time.LocalDate;
 import java.util.List;
@@ -33,25 +31,24 @@ public class FieldController {
     private final FieldService fieldService;
 
     @GetMapping
-    @Operation(summary = "Все активные площадки (пагинация, фильтр по типу и поиску)")
+    @Operation(summary = "Все активные площадки (с пагинацией и фильтрацией)")
     public ResponseEntity<Page<FieldResponse>> getAllActiveFields(
             @RequestParam(defaultValue = "0")  int page,
             @RequestParam(defaultValue = "10") int size,
             @RequestParam(required = false) String type,
-            @RequestParam(required = false) String search,
-            Authentication authentication) {
+            @RequestParam(required = false) String search) {
         Pageable pageable = PageRequest.of(page, size, Sort.by("createdAt").descending());
-        return ResponseEntity.ok(fieldService.getAllActiveFields(pageable, type, search, authentication));
+        return ResponseEntity.ok(fieldService.getAllActiveFields(pageable, type, search));
     }
 
     @GetMapping("/{id}")
     @Operation(summary = "Площадка по ID")
-    public ResponseEntity<FieldResponse> getFieldById(@PathVariable Long id, Authentication authentication) {
-        return ResponseEntity.ok(fieldService.getFieldById(id, authentication));
+    public ResponseEntity<FieldResponse> getFieldById(@PathVariable Long id) {
+        return ResponseEntity.ok(fieldService.getFieldById(id));
     }
 
     @GetMapping("/{id}/schedule")
-    @Operation(summary = "Расписание площадки на день (список слотов)")
+    @Operation(summary = "Расписание площадки на день — список слотов с доступностью")
     public ResponseEntity<List<TimeSlotResponse>> getSchedule(
             @PathVariable Long id,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date) {
@@ -59,7 +56,7 @@ public class FieldController {
     }
 
     @GetMapping("/my")
-    @Operation(summary = "Мои площадки (OWNER)")
+    @Operation(summary = "Мои площадки (для OWNER)")
     @SecurityRequirement(name = "bearerAuth")
     public ResponseEntity<Page<FieldResponse>> getMyFields(
             Authentication authentication,
@@ -87,16 +84,6 @@ public class FieldController {
             @Valid @RequestBody FieldRequest request,
             Authentication authentication) {
         return ResponseEntity.ok(fieldService.updateField(id, request, authentication));
-    }
-
-    @PostMapping(value = "/{id}/photo", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    @Operation(summary = "Загрузить фото площадки (OWNER/ADMIN)")
-    @SecurityRequirement(name = "bearerAuth")
-    public ResponseEntity<FieldResponse> uploadPhoto(
-            @PathVariable Long id,
-            @RequestParam("file") MultipartFile file,
-            Authentication authentication) {
-        return ResponseEntity.ok(fieldService.uploadPhoto(id, file, authentication));
     }
 
     @PutMapping("/{id}/deactivate")

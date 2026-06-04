@@ -4,7 +4,6 @@ import com.football.booking.enums.FieldType;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
-import org.hibernate.annotations.Formula;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -61,14 +60,4 @@ public class Field {
     @OneToMany(mappedBy = "field", cascade = CascadeType.ALL)
     @Builder.Default
     private List<Booking> bookings = new ArrayList<>();
-
-    // Вычисляемые поля через подзапросы — без N+1 запросов
-    @Formula("(SELECT COALESCE(AVG(CAST(r.rating AS FLOAT)), 0.0) FROM reviews r WHERE r.field_id = id)")
-    private Double avgRating;
-
-    @Formula("(SELECT COUNT(*) FROM reviews r WHERE r.field_id = id)")
-    private Long reviewCount;
-
-    @Formula("(SELECT COUNT(*) FROM favorites f WHERE f.field_id = id)")
-    private Long favoriteCount;
 }

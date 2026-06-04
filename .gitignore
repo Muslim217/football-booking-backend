@@ -24,3 +24,6 @@ target/
 ### Logs ###
 *.log
 logs/
+
+### H2 local database ###
+data/
